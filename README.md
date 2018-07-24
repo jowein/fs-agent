@@ -1,4 +1,4 @@
-WhiteSource File System Agent
+Yossi File System Agent
 ==============================
 
 An [external update agent][1] for projects.
