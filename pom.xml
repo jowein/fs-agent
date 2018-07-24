@@ -44,11 +44,6 @@
 
     <developers>
         <developer>
-            <id>anna.rozin</id>
-            <name>Anna Rozin</name>
-            <email>anna.rozin@whitesourcesoftware.com</email>
-        </developer>
-        <developer>
             <id>tom.shapira</id>
             <name>Tom Shapira</name>
             <email>tom.shapira@whitesourcesoftware.com</email>
