@@ -1,4 +1,4 @@
-Yossi File System Agent
+Yossi W. File System Agent
 ==============================
 
 An [external update agent][1] for projects.
