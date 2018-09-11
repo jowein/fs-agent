@@ -8,7 +8,7 @@
     <packaging>jar</packaging>
 
     <name>White Source File System Agent</name>
-    <description>16 File System Agent is a simple java command line tool which extracts descriptive information from your open source libraries</description>
+    <description>17 File System Agent is a simple java command line tool which extracts descriptive information from your open source libraries</description>
     <url>https://github.com/whitesource/fs-agent</url>
 
     <properties>
