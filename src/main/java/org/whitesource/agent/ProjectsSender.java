@@ -51,18 +51,12 @@ import java.util.LinkedList;
  * @author anna.rozin
  */
 public class ProjectsSender {
-    public static final String PROJECT_URL_PREFIX = "Wss/WSS.html#!project;id=";
 
     /* --- Static members --- */
 
     private final Logger logger = LoggerFactory.getLogger(ProjectsSender.class);
+    public static final String PROJECT_URL_PREFIX = "Wss/WSS.html#!project;id=";
 
-    private static final String NEW_LINE = System.lineSeparator();
-    private static final String DOT = ".";
-    private static final String JAVA_NETWORKING = "java.net";
-    private static final int MAX_NUMBER_OF_DEPENDENCIES = 1000000;
-    public static final String BACK_SLASH = "\\";
-    public static final String FORWARD_SLASH = "/";
     /* --- Members --- */
 
     private final SenderConfiguration senderConfig;
@@ -87,7 +81,7 @@ public class ProjectsSender {
         logger.info("Initializing WhiteSource Client");
         Collection<AgentProjectInfo> projects = projectsDetails.getProjects();
         WhitesourceService service = createService();
-        String resultInfo = "";
+        String resultInfo = Constants.EMPTY_STRING;
         if (offlineConfig.isEnabled()) {
             resultInfo = offlineUpdate(service, projects);
             return new Pair<>(resultInfo, this.prepStepStatusCode);
@@ -121,9 +115,10 @@ public class ProjectsSender {
                     break;
                 } catch (WssServiceException e) {
                     if (e.getCause() != null &&
-                            e.getCause().getClass().getCanonicalName().substring(0, e.getCause().getClass().getCanonicalName().lastIndexOf(DOT)).equals(JAVA_NETWORKING)) {
+                            e.getCause().getClass().getCanonicalName().substring(0,
+                                    e.getCause().getClass().getCanonicalName().lastIndexOf(Constants.DOT)).equals(Constants.JAVA_NETWORKING)) {
                         statusCode = StatusCode.CONNECTION_FAILURE;
-                        logger.error("Trying " + (retries + 1) + " more time" + (retries != 0 ? "s" : ""));
+                        logger.error("Trying " + (retries + 1) + " more time" + (retries != 0 ? "s" : Constants.EMPTY_STRING));
                     } else {
                         statusCode = StatusCode.SERVER_FAILURE;
                         retries = -1;
@@ -141,12 +136,11 @@ public class ProjectsSender {
 
                     String requestToken = e.getRequestToken();
                     if (StringUtils.isNotBlank(requestToken)) {
-                        resultInfo += NEW_LINE + "Support token: " + requestToken;
+                        resultInfo += Constants.NEW_LINE + "Support token: " + requestToken;
                         logger.info("Support token: {}", requestToken);
                     }
                 }
             }
-
             if (service != null) {
                 service.shutdown();
             }
@@ -163,7 +157,6 @@ public class ProjectsSender {
             Method getAnalysisMethod
                     = vulnerabilitiesAnalysisClass.getMethod("getAnalysis", String.class, int.class);
             Object vulnerabilitiesAnalysis = null;
-
             for (AgentProjectInfo project : projectsDetails.getProjectToViaComponents().keySet()) {
                 // check language for scan according to user file
                 LinkedList<ViaComponents> viaComponentsList = projectsDetails.getProjectToViaComponents().get(project);
@@ -175,10 +168,9 @@ public class ProjectsSender {
                         vulnerabilitiesAnalysis = getAnalysisMethod.invoke(null, language.toString(), requestConfig.getViaAnalysisLevel());
                         // set app path for java script
                         if (language.equals(ViaLanguage.JAVA_SCRIPT)) {
-                            int lastIndex = appPath.lastIndexOf(BACK_SLASH) != -1 ? appPath.lastIndexOf(BACK_SLASH) : appPath.lastIndexOf(FORWARD_SLASH);
+                            int lastIndex = appPath.lastIndexOf(Constants.BACK_SLASH) != -1 ? appPath.lastIndexOf(Constants.BACK_SLASH) : appPath.lastIndexOf(Constants.FORWARD_SLASH);
                             appPath = appPath.substring(0, lastIndex);
                         }
-
                         if (vulnerabilitiesAnalysis != null) {
                             AgentProjectInfo projectToServer = new AgentProjectInfo();
                             projectToServer.setDependencies(viaComponents.getDependencies());
@@ -188,8 +180,8 @@ public class ProjectsSender {
                             projectToServer.setProjectSetupStatus(project.getProjectSetupStatus());
                             projectToServer.setParentCoordinates(project.getParentCoordinates());
                             Class<?> fsaAgentServerClass = Class.forName("whitesource.analysis.server.FSAgentServer");
-                            Object server = fsaAgentServerClass.getConstructor(AgentProjectInfo.class, WhitesourceService.class, String.class).newInstance(
-                                    projectToServer, service, requestConfig.getApiToken());
+                            Object server = fsaAgentServerClass.getConstructor(AgentProjectInfo.class, WhitesourceService.class, String.class, String.class).newInstance(
+                                    projectToServer, service, requestConfig.getApiToken(), requestConfig.getUserKey());
                             logger.info("Starting analysis for: {}", appPath);
                             Class<?> serverClass = Class.forName("whitesource.analysis.server.Server");
                             Method runAnalysis = vulnerabilitiesAnalysisClass.getDeclaredMethod("runAnalysis", serverClass, String.class, Collection.class, Boolean.class);
@@ -210,11 +202,10 @@ public class ProjectsSender {
         }
     }
 
-
     private void checkDependenciesUpbound(Collection<AgentProjectInfo> projects) {
         int numberOfDependencies = projects.stream().map(x -> x.getDependencies()).mapToInt(x -> x.size()).sum();
-        if (numberOfDependencies > MAX_NUMBER_OF_DEPENDENCIES) {
-            logger.warn("Number of dependencies: {} exceeded the maximum supported: {}", numberOfDependencies, MAX_NUMBER_OF_DEPENDENCIES);
+        if (numberOfDependencies > Constants.MAX_NUMBER_OF_DEPENDENCIES) {
+            logger.warn("Number of dependencies: {} exceeded the maximum supported: {}", numberOfDependencies, Constants.MAX_NUMBER_OF_DEPENDENCIES);
         }
     }
 
@@ -237,7 +228,8 @@ public class ProjectsSender {
         boolean policyCompliance = true;
         if (senderConfig.isCheckPolicies()) {
             logger.info("Checking policies");
-            CheckPolicyComplianceResult checkPoliciesResult = service.checkPolicyCompliance(requestConfig.getApiToken(), requestConfig.getProductNameOrToken(), requestConfig.getProductVersion(), projects, senderConfig.isForceCheckAllDependencies(), requestConfig.getUserKey());
+            CheckPolicyComplianceResult checkPoliciesResult = service.checkPolicyCompliance(requestConfig.getApiToken(), requestConfig.getProductNameOrToken(),
+                    requestConfig.getProductVersion(), projects, senderConfig.isForceCheckAllDependencies(), requestConfig.getUserKey(), requestConfig.getRequesterEmail());
             if (checkPoliciesResult.hasRejections()) {
                 if (senderConfig.isForceUpdate()) {
                     logger.info("Some dependencies violate open source policies, however all were force " +
@@ -273,21 +265,22 @@ public class ProjectsSender {
 
     private String update(WhitesourceService service, Collection<AgentProjectInfo> projects) throws WssServiceException {
         logger.info("Sending Update");
-        UpdateInventoryResult updateResult = service.update(requestConfig.getApiToken(), requestConfig.getRequesterEmail(),
-                UpdateType.valueOf(senderConfig.getUpdateTypeValue()), requestConfig.getProductNameOrToken(), requestConfig.getProductVersion(), projects, requestConfig.getUserKey());
+        UpdateInventoryResult updateResult = service.update(requestConfig.getApiToken(), requestConfig.getRequesterEmail(), UpdateType.valueOf(senderConfig.getUpdateTypeValue()),
+                requestConfig.getProductNameOrToken(), requestConfig.getProductVersion(), projects, requestConfig.getUserKey());
         String resultInfo = logResult(updateResult);
 
         // remove line separators
-        resultInfo = resultInfo.replace(System.lineSeparator(), "");
+        resultInfo = resultInfo.replace(System.lineSeparator(), Constants.EMPTY_STRING);
         return resultInfo;
     }
 
     private String offlineUpdate(WhitesourceService service, Collection<AgentProjectInfo> projects) {
-        String resultInfo = "";
+        String resultInfo = Constants.EMPTY_STRING;
         logger.info("Generating offline update request");
 
         // generate offline request
-        UpdateInventoryRequest updateRequest = service.offlineUpdate(requestConfig.getApiToken(), requestConfig.getProductNameOrToken(), requestConfig.getProductVersion(), projects, requestConfig.getUserKey());
+        UpdateInventoryRequest updateRequest = service.offlineUpdate(requestConfig.getApiToken(), requestConfig.getProductNameOrToken(),
+                requestConfig.getProductVersion(), projects, requestConfig.getUserKey());
 
         updateRequest.setRequesterEmail(requestConfig.getRequesterEmail());
         try {
@@ -332,47 +325,43 @@ public class ProjectsSender {
     }
 
     private String logResult(UpdateInventoryResult updateResult) {
-        StringBuilder resultLogMsg = new StringBuilder("Inventory update results for ").append(updateResult.getOrganization()).append(NEW_LINE);
-
+        StringBuilder resultLogMsg = new StringBuilder("Inventory update results for ").append(updateResult.getOrganization()).append(Constants.NEW_LINE);
         logger.info("Inventory update results for {}", updateResult.getOrganization());
-
         // newly created projects
         Collection<String> createdProjects = updateResult.getCreatedProjects();
         if (createdProjects.isEmpty()) {
             logger.info("No new projects found.");
-            resultLogMsg.append("No new projects found.").append(NEW_LINE);
+            resultLogMsg.append("No new projects found.").append(Constants.NEW_LINE);
         } else {
             logger.info("Newly created projects:");
-            resultLogMsg.append("Newly created projects:").append(NEW_LINE);
+            resultLogMsg.append("Newly created projects:").append(Constants.NEW_LINE);
             for (String projectName : createdProjects) {
                 logger.info("# {}", projectName);
-                resultLogMsg.append(projectName).append(NEW_LINE);
+                resultLogMsg.append(projectName).append(Constants.NEW_LINE);
             }
         }
-
 
         // updated projects
         Collection<String> updatedProjects = updateResult.getUpdatedProjects();
         if (updatedProjects.isEmpty()) {
             logger.info("No projects were updated.");
-            resultLogMsg.append("No projects were updated.").append(NEW_LINE);
+            resultLogMsg.append("No projects were updated.").append(Constants.NEW_LINE);
         } else {
             logger.info("Updated projects:");
-            resultLogMsg.append("Updated projects:").append(NEW_LINE);
+            resultLogMsg.append("Updated projects:").append(Constants.NEW_LINE);
             for (String projectName : updatedProjects) {
                 logger.info("# {}", projectName);
-                resultLogMsg.append(projectName).append(NEW_LINE);
+                resultLogMsg.append(projectName).append(Constants.NEW_LINE);
             }
         }
-
         // reading projects' URLs
         HashMap<String, Integer> projectsUrls = updateResult.getProjectNamesToIds();
         if (projectsUrls != null && !projectsUrls.isEmpty()) {
             for (String projectName : projectsUrls.keySet()) {
-                String appUrl = senderConfig.getServiceUrl().replace("agent", "");
+                String appUrl = senderConfig.getServiceUrl().replace("agent", Constants.EMPTY_STRING);
                 String projectsUrl = appUrl + PROJECT_URL_PREFIX + projectsUrls.get(projectName);
                 logger.info("Project name: {}, URL: {}", projectName, projectsUrl);
-                resultLogMsg.append(NEW_LINE).append("Project name: ").append(projectName).append(", project URL:").append(projectsUrl);
+                resultLogMsg.append(Constants.NEW_LINE).append("Project name: ").append(projectName).append(", project URL:").append(projectsUrl);
             }
         }
 
@@ -380,7 +369,7 @@ public class ProjectsSender {
         String requestToken = updateResult.getRequestToken();
         if (StringUtils.isNotBlank(requestToken)) {
             logger.info("Support Token: {}", requestToken);
-            resultLogMsg.append(NEW_LINE).append("Support Token: ").append(requestToken);
+            resultLogMsg.append(Constants.NEW_LINE).append("Support Token: ").append(requestToken);
         }
         return resultLogMsg.toString();
     }

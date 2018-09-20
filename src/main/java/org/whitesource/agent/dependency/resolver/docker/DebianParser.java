@@ -1,14 +1,15 @@
 package org.whitesource.agent.dependency.resolver.docker;
 
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.whitesource.agent.Constants;
 import org.whitesource.agent.api.model.DependencyInfo;
 
 import java.io.*;
 import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.LinkedList;
-
-import static org.whitesource.agent.dependency.resolver.docker.DockerResolver.*;
 
 /**
  * @author chen.luigi
@@ -17,17 +18,11 @@ public class DebianParser extends AbstractParser {
 
     /* --- Static members --- */
 
+    private final Logger logger = LoggerFactory.getLogger(DebianParser.class);
     private static final String PACKAGE = "Package";
     private static final String VERSION = "Version";
     private static final String ARCHITECTURE = "Architecture";
-    private static final String SYSTEMPATH = "Filename";
-    private static final String MD5 = "MD5sum";
-    private static final String COLON = ":";
-
     private static final String DEBIAN_PACKAGE_PATTERN = "{0}_{1}_{2}.deb";
-    private static final String SLASH_SEPERATOR = "/";
-    public static final String PLUS = "+";
-
 
     /* --- Overridden methods --- */
 
@@ -48,19 +43,19 @@ public class DebianParser extends AbstractParser {
             // Create Debian package - package-version-architecture.deb
             while ((line = br.readLine()) != null) {
                 if (!line.isEmpty()) {
-                    String[] lineSplit = line.split(COLON);
+                    String[] lineSplit = line.split(Constants.COLON);
                     String dependencyParameter = lineSplit[1].trim();
                     switch (lineSplit[0]) {
                         case PACKAGE:
                             packageInfo.setPackageName(dependencyParameter);
                             break;
                         case VERSION:
-                            if(packageInfo.getPackageName()!=null){
+                            if (packageInfo.getPackageName() != null) {
                                 packageInfo.setVersion(dependencyParameter);
                             }
                             break;
                         case ARCHITECTURE:
-                            if(packageInfo.getPackageName()!=null) {
+                            if (packageInfo.getPackageName() != null) {
                                 packageInfo.setArchitecture(dependencyParameter);
                             }
                             break;
@@ -68,7 +63,7 @@ public class DebianParser extends AbstractParser {
                             break;
                     }
                 } else {
-                    if(packageInfo.getPackageName()!=null) {
+                    if (packageInfo.getPackageName() != null) {
                         DependencyInfo dependencyInfo = createDependencyInfo(packageInfo);
                         packageInfo = new Package();
                         dependencyInfos.add(dependencyInfo);
@@ -76,9 +71,9 @@ public class DebianParser extends AbstractParser {
                 }
             }
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            logger.error("Error getting package data", e.getMessage());
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Error getting package data", e.getMessage());
         } finally {
             closeStream(br, fr);
         }
@@ -86,10 +81,7 @@ public class DebianParser extends AbstractParser {
     }
 
     @Override
-    public File findFile(String[] files, String filename,String operatingSystem) {
-        if (!operatingSystem.startsWith(WINDOWS)){
-            filename = filename.replace(WINDOWS_SEPARATOR,LINUX_SEPARATOR);
-        }
+    public File findFile(String[] files, String filename) {
         for (String filepath : files) {
             if (filepath.endsWith(filename)) {
                 return new File(filepath);
@@ -102,20 +94,22 @@ public class DebianParser extends AbstractParser {
 
     private DependencyInfo createDependencyInfo(Package packageInfo) {
         DependencyInfo dependencyInfo = null;
-        if (StringUtils.isNotBlank(packageInfo.getPackageName()) && StringUtils.isNotBlank(packageInfo.getVersion()) && StringUtils.isNotBlank(packageInfo.getArchitecture())) {
-            if (packageInfo.getVersion().contains(PLUS)) {
+        if (StringUtils.isNotBlank(packageInfo.getPackageName()) && StringUtils.isNotBlank(packageInfo.getVersion()) &&
+                StringUtils.isNotBlank(packageInfo.getArchitecture())) {
+            if (packageInfo.getVersion().contains(Constants.PLUS)) {
                 dependencyInfo = new DependencyInfo(
-                        null, MessageFormat.format(DEBIAN_PACKAGE_PATTERN, packageInfo.getPackageName(), packageInfo.getVersion().substring(0, packageInfo.getVersion().lastIndexOf(PLUS)), packageInfo.getArchitecture()), packageInfo.getVersion());
+                        null, MessageFormat.format(DEBIAN_PACKAGE_PATTERN, packageInfo.getPackageName(),
+                        packageInfo.getVersion().substring(0, packageInfo.getVersion().lastIndexOf(Constants.PLUS)), packageInfo.getArchitecture()), packageInfo.getVersion());
             } else {
                 dependencyInfo = new DependencyInfo(
-                        null, MessageFormat.format(DEBIAN_PACKAGE_PATTERN, packageInfo.getPackageName(), packageInfo.getVersion(), packageInfo.getArchitecture()), packageInfo.getVersion());
+                        null, MessageFormat.format(DEBIAN_PACKAGE_PATTERN, packageInfo.getPackageName(),
+                        packageInfo.getVersion(), packageInfo.getArchitecture()), packageInfo.getVersion());
             }
         }
         if (dependencyInfo != null) {
             return dependencyInfo;
         } else {
             return null;
-
         }
     }
 

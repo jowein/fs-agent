@@ -18,12 +18,14 @@ package org.whitesource.agent.utils;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.whitesource.agent.Constants;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,6 +37,31 @@ public class FilesUtils {
     /* --- Static members --- */
 
     private final Logger logger = LoggerFactory.getLogger(FilesUtils.class);
+    private final String JAVA_TEMP_DIR = System.getProperty("java.io.tmpdir");
+
+
+    public String createTmpFolder(boolean addCharToEndOfUrl, String nameOfFolder) {
+        String result = getTempDirPackages(addCharToEndOfUrl, nameOfFolder);
+        try {
+            FileUtils.forceMkdir(new File(result));
+        } catch (IOException e) {
+            logger.warn("Failed to create temp folder : " + e.getMessage());
+            result = null;
+        }
+        return result;
+    }
+
+    private String getTempDirPackages(boolean addCharToEndOfUrl, String nameOfFolder) {
+        String creationDate = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+        String tempFolder = JAVA_TEMP_DIR.endsWith(File.separator) ? JAVA_TEMP_DIR + nameOfFolder + File.separator + creationDate :
+                JAVA_TEMP_DIR + File.separator + nameOfFolder + File.separator + creationDate;
+
+        if (addCharToEndOfUrl) {
+            tempFolder = tempFolder + "1";
+        }
+
+        return tempFolder;
+    }
 
     public List<Path> getSubDirectories(String directory, String[] includes, String[] excludesExtended, boolean followSymlinks, boolean globCaseSensitive) {
         String[] files;
@@ -91,5 +118,15 @@ public class FilesUtils {
                 // do nothing
             }
         }
+    }
+
+    public static String getFileExtension(String fileName) {
+        if(fileName == null) fileName = Constants.EMPTY_STRING;
+        String extension = Constants.EMPTY_STRING;
+        int i = fileName.lastIndexOf(Constants.DOT);
+        if (i > 0 && i < fileName.length()-2) {
+            extension = fileName.substring(i+1);
+        }
+        return extension;
     }
 }

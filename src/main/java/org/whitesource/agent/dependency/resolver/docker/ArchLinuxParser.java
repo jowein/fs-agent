@@ -1,14 +1,14 @@
 package org.whitesource.agent.dependency.resolver.docker;
 
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.whitesource.agent.api.model.DependencyInfo;
 
 import java.io.*;
 import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.LinkedList;
-
-import static org.whitesource.agent.dependency.resolver.docker.DockerResolver.*;
 
 
 /**
@@ -17,6 +17,7 @@ import static org.whitesource.agent.dependency.resolver.docker.DockerResolver.*;
 public class ArchLinuxParser extends AbstractParser {
 
     /* --- Static members --- */
+    private final Logger logger = LoggerFactory.getLogger(ArchLinuxParser.class);
 
     private static final String PACKAGE = "%NAME%";
     private static final String VERSION = "%VERSION%";
@@ -60,9 +61,9 @@ public class ArchLinuxParser extends AbstractParser {
                         }
                         dependencyInfos.add(createDependencyInfo(packageInfo));
                     } catch (FileNotFoundException e) {
-                        e.printStackTrace();
+                        logger.error("Error getting package data", e.getMessage());
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        logger.error("Error getting package data", e.getMessage());
                     } finally {
                         closeStream(br, fr);
                     }
@@ -73,26 +74,25 @@ public class ArchLinuxParser extends AbstractParser {
     }
 
     /**
-     * @param files - list of files to look for
+     * @param files                      - list of files to look for
      * @param pathToPackageManagerFolder the relevant path for the folder with all the installed packages
      * @return Folder file with all the information about the installed packages
      */
     @Override
-    public File findFile(String[] files, String pathToPackageManagerFolder,String operatingSystem) {
+    public File findFile(String[] files, String pathToPackageManagerFolder) {
         int max = 0;
         File archLinuxPackageManagerFile = null;
-        if (!operatingSystem.startsWith(WINDOWS)){
-            pathToPackageManagerFolder = pathToPackageManagerFolder.replace(WINDOWS_SEPARATOR,LINUX_SEPARATOR);
-        }
         for (String filepath : files) {
             if (filepath.contains(pathToPackageManagerFolder) && filepath.endsWith(DESC)) {
                 int descStartIndex = filepath.lastIndexOf(pathToPackageManagerFolder);
                 if (descStartIndex > 0) {
                     String descPath = filepath.substring(0, descStartIndex + pathToPackageManagerFolder.length());
                     File file = new File(descPath);
-                    if (max < file.listFiles().length) {
-                        max = file.listFiles().length;
-                        archLinuxPackageManagerFile = file;
+                    if (file.listFiles() != null) {
+                        if (max < file.listFiles().length) {
+                            max = file.listFiles().length;
+                            archLinuxPackageManagerFile = file;
+                        }
                     }
                 }
             }

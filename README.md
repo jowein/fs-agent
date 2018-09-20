@@ -1,5 +1,4 @@
 WhiteSource File System Agent 18
-==============================
 
 An [external update agent][1] for projects.
 

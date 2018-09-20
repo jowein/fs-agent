@@ -15,235 +15,82 @@
  */
 package org.whitesource.agent.dependency.resolver.python;
 
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.whitesource.agent.api.dispatch.UpdateInventoryRequest;
+import org.whitesource.agent.Constants;
 import org.whitesource.agent.api.model.AgentProjectInfo;
+import org.whitesource.agent.api.model.DependencyInfo;
 import org.whitesource.agent.api.model.DependencyType;
 import org.whitesource.agent.dependency.resolver.AbstractDependencyResolver;
 import org.whitesource.agent.dependency.resolver.ResolutionResult;
-import org.whitesource.agent.utils.CommandLineProcess;
-import org.whitesource.fs.OfflineReader;
+import org.whitesource.agent.utils.FilesUtils;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.whitesource.scm.ScmConnector.SCM_CONNECTOR_TMP_DIRECTORY;
-
 public class PythonDependencyResolver extends AbstractDependencyResolver {
+
+    /* -- Members -- */
+
+    private final String pythonPath;
+    private final String pipPath;
+    private final Collection<String> excludes = Arrays.asList(Constants.PATTERN + PY_EXT);
+    private boolean ignorePipInstallErrors;
+    private boolean installVirutalenv;
+    private boolean resolveHierarchyTree;
+    private String[] pythonRequirementsFileIncludes;
 
     /* --- Static members --- */
 
-    private final Logger logger = LoggerFactory.getLogger(org.whitesource.agent.dependency.resolver.python.PythonDependencyResolver.class);
-    private static final String PATTERN = "**/*";
-    private static final String PYTHON_BOM = "requirements.txt";
-    private static final String WHITESOURCE_TEMP_FOLDER = "Whitesource_python_resolver";
-
-    private static final String WS_SETUP_PY = "ws_setup.py";
-    private static final String WS_CONFIG = "ws_config.py";
-    private static final String INSTALL = "install";
-    private static final String WHITESOURCE_UPDATE_COMMAND = "whitesource_update";
-    private static final String CONFIG_FLAG = "-p";
-    private static final String WS_PYTHON_PACKAGE_NAME = "ws-python-package-name";
-    private static final String UNINSTALL = "uninstall";
-    private static final String WSS_PLUGIN = "wss_plugin";
-    private static final String YES = "-y";
-    private static final String UPDATE_REQUEST_JSON = "update_request.json";
-    private static final String WHITESOURCE_OFFLINE_FOLDER = "whitesource";
-    private static final String OFFLINE_FLAG = "-o";
-    private static final String TRUE = "True";
-    private static final String WS_PYTHON_PACKAGE_VERSION = "9.9.9.9";
+    //private static final String PYTHON_BOM = "requirements.txt";
     private static final String PY_EXT = ".py";
-    private static final String SPACE = " ";
-    private final String JAVA_TEMP_DIR = System.getProperty("java.io.tmpdir");
+    public static final String WHITESOURCE_PYTHON_TEMP_FOLDER = "Whitesource_python_resolver";
 
-    private final String[] pythonConfig = new String[]{
-            "# config_file.py",
-            "config_info = {",
-            "'org_token': 'org-token',",
-            "'check_policies': True,",
-            "'force_check_all_dependencies': True,",
-            "'force_update': True,",
-            "'product_name': '" + WS_PYTHON_PACKAGE_NAME + "',",
-            "'product_version': '1.0',",
-            "'index_url': 'https://pypi.python.org/simple/', #optional",
-            "'proxy': {",
-            "'host': '',",
-            "'port': '',",
-            "'username': '',",
-            "'password': ''",
-            "}",
-            "}"};
+    /* --- Constructors --- */
 
-    private final String[] setupPy = new String[]{
-            "from setuptools import setup",
-            "from plugin import WssPythonPlugin",
-            "requirements=WssPythonPlugin.open_required('requirements.txt')",
-            "setup(",
-            "    name=\"" + WS_PYTHON_PACKAGE_NAME + "\",",
-            "    version=\"" + WS_PYTHON_PACKAGE_VERSION + "\",",
-            "    entry_points={\"distutils.commands\": [\"whitesource_update = plugin.WssPythonPlugin:SetupToolsCommand\"]},",
-            "    install_requires=requirements,",
-            "    author=\"name\",",
-            "    author_email=\"me@example.com\",",
-            "    description=\"This is an example package\",",
-            ")"};
-
-    private final String WS_PYTHON_PACKAGE_NAME_UNINSTALL_COMMAND;
-
-    private final Collection<String> excludes = Arrays.asList("**/*" + PY_EXT);
-    private final String pythonPath;
-    private final String pipPath;
-    private final boolean isPythonIsWssPluginInstalled;
-    private final boolean uninstallPythonPlugin;
-
-    public PythonDependencyResolver(String pythonPath, String pipPath , boolean isPythonIsWssPluginInstalled , boolean uninstallPythonPlugin) {
+    public PythonDependencyResolver(String pythonPath, String pipPath, boolean ignorePipInstallErrors,
+                                    boolean installVirtualEnv, boolean resolveHierarchyTree, String[] pythonRequirementsFileIncludes) {
         super();
         this.pythonPath = pythonPath;
         this.pipPath = pipPath;
-        WS_PYTHON_PACKAGE_NAME_UNINSTALL_COMMAND = pipPath + SPACE + UNINSTALL + SPACE + YES + SPACE + WS_PYTHON_PACKAGE_NAME;
-        this.isPythonIsWssPluginInstalled = isPythonIsWssPluginInstalled;
-        this.uninstallPythonPlugin = uninstallPythonPlugin;
+        this.ignorePipInstallErrors = ignorePipInstallErrors;
+        this.installVirutalenv = installVirtualEnv;
+        this.resolveHierarchyTree = resolveHierarchyTree;
+        this.pythonRequirementsFileIncludes = pythonRequirementsFileIncludes;
     }
-
-    /* --- Overridden methods --- */
 
     @Override
-    public ResolutionResult resolveDependencies(String projectFolder, String topLevelFolder, Set<String> configFiles) {
-        String tempDir = getTempDir();
-        Map<AgentProjectInfo, Path> resolvedProjects = new HashMap<>();
-        String[] args = new String[0];
-        List<String> output = new ArrayList<>();
-        try {
-            FileUtils.forceMkdir(new File(tempDir));
+    public ResolutionResult resolveDependencies(String projectFolder, String topLevelFolder, Set<String> requirementsFiles) {
+        Collection<DependencyInfo> resultDependencies = new LinkedList<>();
+        for (String requirementsTxtPath : requirementsFiles) {
+            FilesUtils filesUtils = new FilesUtils();
+            String tempDirVirtualEnv = filesUtils.createTmpFolder(true, WHITESOURCE_PYTHON_TEMP_FOLDER);
+            String tempDirPackages = filesUtils.createTmpFolder(false, WHITESOURCE_PYTHON_TEMP_FOLDER);
 
-            // FSA will copy the whole directory to a temp folder
-            boolean isTempDirectory = topLevelFolder.contains(SCM_CONNECTOR_TMP_DIRECTORY);
-            if (!isTempDirectory) {
-                FileUtils.copyDirectory(new File(topLevelFolder), new File(tempDir));
-            } else {
-                tempDir = topLevelFolder;
+            Collection<DependencyInfo> dependencies = new LinkedList<>();
+            PythonDependencyCollector pythonDependencyCollector;
+            if (tempDirVirtualEnv != null && tempDirPackages != null) {
+                pythonDependencyCollector = new PythonDependencyCollector(this.pythonPath, this.pipPath, this.installVirutalenv, this.resolveHierarchyTree, this.ignorePipInstallErrors,
+                        requirementsTxtPath, tempDirPackages, tempDirVirtualEnv);
+                String currentTopLevelFolder = requirementsTxtPath.substring(0, requirementsTxtPath.replaceAll("\\\\",
+                        Constants.FORWARD_SLASH).lastIndexOf(Constants.FORWARD_SLASH));
+                Collection<AgentProjectInfo> projects = pythonDependencyCollector.collectDependencies(currentTopLevelFolder);
+                dependencies = projects.stream().flatMap(project -> project.getDependencies().stream()).collect(Collectors.toList());
+                // delete tmp folders
+                FilesUtils.deleteDirectory(new File(tempDirVirtualEnv));
+                FilesUtils.deleteDirectory(new File(tempDirPackages));
             }
-
-            // FSA will crete custom ws_setup.py and custom ws_config.py
-            Path pathConfig = Paths.get(tempDir.toString(), WS_CONFIG);
-            Path pathSetupPy = Paths.get(tempDir.toString(), WS_SETUP_PY);
-
-            saveConfigFile(pathConfig, pythonConfig);
-            saveConfigFile(pathSetupPy, setupPy);
-
-            // FSA will run "pip install wss_plugin"
-            if (!isPythonIsWssPluginInstalled) {
-                output = processCommand(tempDir, new String[]{pipPath, INSTALL, WSS_PLUGIN}, false);
-            }
-            // FSA will run "python setup.py install"
-            output = processCommand(tempDir, new String[]{pythonPath, WS_SETUP_PY, INSTALL}, true);
-            // FSA will run "python setup.py whitesource_update -p "custom_config.py"
-            output = processCommand(tempDir, new String[]{pythonPath, WS_SETUP_PY, WHITESOURCE_UPDATE_COMMAND, CONFIG_FLAG, WS_CONFIG, OFFLINE_FLAG, TRUE}, false);
-
-            // Python-plugin will export an offline file
-            // FSA will read the python offline request
-            OfflineReader offlineReader = new OfflineReader();
-            String offlineFile = Paths.get(tempDir, WHITESOURCE_OFFLINE_FOLDER, UPDATE_REQUEST_JSON).toString();
-            if (Files.exists(Paths.get(offlineFile))) {
-                Collection<UpdateInventoryRequest> updateInventoryRequests = offlineReader.getAgentProjectsFromRequests(Arrays.asList(offlineFile));
-                Collection<AgentProjectInfo> projects = updateInventoryRequests.stream().flatMap(update -> update.getProjects().stream()).collect(Collectors.toList());
-                // add projects to map
-                if (projects != null && projects.size() > 0) {
-                    AgentProjectInfo project = projects.stream().findFirst().get();
-                    project.getDependencies().forEach(dependencyInfo ->
-                            dependencyInfo.setDependencyType(DependencyType.PYTHON));
-                    resolvedProjects.put(project, Paths.get(tempDir));
-                }
-            } else {
-                logger.warn("Failed getting python dependencies");
-            }
-
-            // FSA will run pip uninstall "project-name"
-            output = processCommand(tempDir, new String[]{pipPath, UNINSTALL, YES, WS_PYTHON_PACKAGE_NAME}, false);
-
-            // FSA will run "pip uninstall wss_plugin" if we already installed and the user asked for uninstall
-            if (uninstallPythonPlugin && !isPythonIsWssPluginInstalled) {
-                output = processCommand(tempDir, new String[]{pipPath, UNINSTALL, YES, WSS_PLUGIN}, false);
-            }
-
-            if (!isTempDirectory) {
-                FileUtils.deleteDirectory(new File(tempDir));
-            }
-        } catch (IOException e) {
-            logger.warn("Failed to get python dependencies : " + e.getMessage());
-            logger.debug("Error while running ", String.join(" ", args));
-            logger.debug("Error while running ", String.join(" ", output));
+            resultDependencies.addAll(dependencies);
         }
-
-        return new ResolutionResult(resolvedProjects, getExcludes(), DependencyType.PYTHON, topLevelFolder);
-    }
-
-    private List<String> processCommand(String tempDir, String[] args, boolean setupInstall) throws IOException {
-        try {
-            CommandLineProcess commandLineProcess = new CommandLineProcess(tempDir, args);
-            List<String> lines = commandLineProcess.executeProcess();
-            if (commandLineProcess.isErrorInProcess()) {
-                logger.debug("Fail to run '" + String.join(" ", args) + "' in '" + tempDir + "'.\n");
-                if (!String.join(" ", args).equals(WS_PYTHON_PACKAGE_NAME_UNINSTALL_COMMAND)) {
-                    StringBuilder result = new StringBuilder();
-                    if (logger.isDebugEnabled()) {
-                        lines = commandLineProcess.executeProcessWithErrorOutput();
-                        for (String line : lines) {
-                            result.append(System.lineSeparator() + line);
-                        }
-                    }
-                    if (setupInstall) {
-                        if (!logger.isDebugEnabled()) {
-                            logger.warn("Fail to install requirements.txt dependencies. To see the full error, re-run the plugin with this parameter in the config file: log.level=debug");
-                        } else {
-                            logger.debug("Fail to install requirements.txt dependencies. The error output is: {}", result);
-                        }
-                    }
-                    if (!setupInstall) {
-                        logger.debug("Fail to run '" + String.join(" ", args) + "' in '" + tempDir + ". " + "The error output is: {}", result);
-                    }
-                }
-            }
-            return lines;
-        } catch (IOException ioe) {
-            logger.warn("Consider adding '" + args[0] + "' to the PATH or set '" + args[0] + "' full path in the configuration file");
-            throw ioe;
-        }
-    }
-
-    private boolean saveConfigFile(Path config, String[] fileLines) {
-        try {
-            Files.write(config, Arrays.stream(fileLines).collect(Collectors.toList()));
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
-        return true;
-    }
-
-    private String getTempDir() {
-        String creationDate = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
-        String tempFolder = JAVA_TEMP_DIR.endsWith(File.separator) ? JAVA_TEMP_DIR + WHITESOURCE_TEMP_FOLDER + File.separator + creationDate :
-                JAVA_TEMP_DIR + File.separator + WHITESOURCE_TEMP_FOLDER + File.separator + creationDate;
-
-        return tempFolder;
+        return new ResolutionResult(resultDependencies, getExcludes(), getDependencyType(), topLevelFolder);
     }
 
     @Override
     protected Collection<String> getExcludes() {
-        return excludes ;
+        return excludes;
     }
 
     @Override
-    protected Collection<String> getSourceFileExtensions() {
+    public Collection<String> getSourceFileExtensions() {
         return new ArrayList<>(Arrays.asList(PY_EXT));
     }
 
@@ -253,12 +100,28 @@ public class PythonDependencyResolver extends AbstractDependencyResolver {
     }
 
     @Override
-    public String getBomPattern() {
-        return PATTERN + PYTHON_BOM;
+    protected String getDependencyTypeName() {
+        return DependencyType.PYTHON.name();
+    }
+
+    @Override
+    public String[] getBomPattern() {
+        return pythonRequirementsFileIncludes;
     }
 
     @Override
     protected Collection<String> getLanguageExcludes() {
         return new ArrayList<>();
     }
+
+    /* --- Getters / Setters --- */
+
+    public String getPythonPath() {
+        return pythonPath;
+    }
+
+    public String getPipPath() {
+        return pipPath;
+    }
 }
+

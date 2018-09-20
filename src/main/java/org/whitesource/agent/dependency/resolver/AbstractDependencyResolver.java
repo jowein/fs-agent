@@ -16,9 +16,11 @@
 package org.whitesource.agent.dependency.resolver;
 
 import org.apache.commons.lang.StringUtils;
+import org.whitesource.agent.Constants;
 import org.whitesource.agent.api.model.DependencyType;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -31,27 +33,29 @@ public abstract class AbstractDependencyResolver {
 
     /* --- Static Members --- */
 
-    private static final String BACK_SLASH = "\\";
-    protected static final String FORWARD_SLASH = "/";
-    private static final String EMPTY_STRING = "";
     protected static final String GLOB_PATTERN = "**/";
-    private static final String FILE_SEPARATOR = "file.separator";
-    protected static final String fileSeparator = System.getProperty(FILE_SEPARATOR);
+    protected static final String fileSeparator = System.getProperty(Constants.FILE_SEPARATOR);
     protected IBomParser bomParser;
 
     /* --- Abstract methods --- */
 
-    protected abstract ResolutionResult resolveDependencies(String projectFolder, String topLevelFolder, Set<String> bomFiles);
+    protected abstract ResolutionResult resolveDependencies(String projectFolder, String topLevelFolder, Set<String> bomFiles) throws FileNotFoundException;
 
     protected abstract Collection<String> getExcludes();
 
-    protected abstract Collection<String> getSourceFileExtensions();
-
     protected abstract DependencyType getDependencyType();
 
-    protected abstract String getBomPattern();
+    protected abstract String getDependencyTypeName();
+
+    protected abstract String[] getBomPattern();
 
     protected abstract Collection<String> getLanguageExcludes();
+
+    protected boolean printResolvedFolder() {
+        return true;
+    }
+
+    public abstract Collection<String> getSourceFileExtensions();
 
     /* --- Protected methods --- */
 
@@ -59,22 +63,22 @@ public abstract class AbstractDependencyResolver {
         String normalizedRoot = new File(parentFolder).getPath();
         if (normalizedRoot.equals(topFolderFound)) {
             topFolderFound = topFolderFound
-                    .replace(normalizedRoot, EMPTY_STRING)
-                    .replace(BACK_SLASH, FORWARD_SLASH);
+                    .replace(normalizedRoot, Constants.EMPTY_STRING)
+                    .replace(Constants.BACK_SLASH, Constants.FORWARD_SLASH);
         } else {
             topFolderFound = topFolderFound
-                    .replace(parentFolder, EMPTY_STRING)
-                    .replace(BACK_SLASH, FORWARD_SLASH);
+                    .replace(parentFolder, Constants.EMPTY_STRING)
+                    .replace(Constants.BACK_SLASH, Constants.FORWARD_SLASH);
         }
 
         if (topFolderFound.length() > 0)
-            topFolderFound = topFolderFound.substring(1, topFolderFound.length()) + FORWARD_SLASH;
+            topFolderFound = topFolderFound.substring(1, topFolderFound.length()) + Constants.FORWARD_SLASH;
 
         String finalRes = topFolderFound;
         if (StringUtils.isBlank(folderToIgnore)) {
             return excludes.stream().map(exclude -> finalRes + exclude).collect(Collectors.toList());
         } else {
-            return excludes.stream().map(exclude -> finalRes + folderToIgnore + FORWARD_SLASH + exclude).collect(Collectors.toList());
+            return excludes.stream().map(exclude -> finalRes + folderToIgnore + Constants.FORWARD_SLASH + exclude).collect(Collectors.toList());
         }
     }
 }

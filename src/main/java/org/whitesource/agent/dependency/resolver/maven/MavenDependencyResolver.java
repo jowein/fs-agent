@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package org.whitesource.agent.dependency.resolver.maven;
+import org.whitesource.agent.Constants;
 import org.whitesource.agent.api.model.AgentProjectInfo;
 import org.whitesource.agent.api.model.DependencyType;
 import org.whitesource.agent.dependency.resolver.AbstractDependencyResolver;
@@ -38,15 +39,15 @@ public class MavenDependencyResolver extends AbstractDependencyResolver {
 
     private static final String POM_XML = "**/pom.xml";
     private static final List<String> JAVA_EXTENSIONS = Arrays.asList(".java", ".jar", ".war", ".ear", ".car", ".class");
-    private static final String TEST = String.join(File.separator, new String[]{"src", "test"});
+    private static final String TEST = String.join(File.separator, new String[]{Constants.SRC, "test"});
     private final boolean mavenAggregateModules;
     private final boolean dependenciesOnly;
 
     /* --- Constructor --- */
 
-    public MavenDependencyResolver(boolean mavenAggregateModules, String[] mavenIgnoredScopes, boolean dependenciesOnly) {
+    public MavenDependencyResolver(boolean mavenAggregateModules, String[] mavenIgnoredScopes, boolean dependenciesOnly, boolean ignorePomModules) {
         super();
-        this.dependencyCollector = new MavenTreeDependencyCollector(mavenIgnoredScopes);
+        this.dependencyCollector = new MavenTreeDependencyCollector(mavenIgnoredScopes, ignorePomModules);
         this.bomParser = new MavenPomParser();
         this.mavenAggregateModules = mavenAggregateModules;
         this.dependenciesOnly = dependenciesOnly;
@@ -106,7 +107,7 @@ public class MavenDependencyResolver extends AbstractDependencyResolver {
     }
 
     @Override
-    protected Collection<String> getSourceFileExtensions() {
+    public Collection<String> getSourceFileExtensions() {
         return JAVA_EXTENSIONS;
     }
 
@@ -116,8 +117,13 @@ public class MavenDependencyResolver extends AbstractDependencyResolver {
     }
 
     @Override
-    public String getBomPattern() {
-        return POM_XML;
+    protected String getDependencyTypeName() {
+        return DependencyType.MAVEN.name();
+    }
+
+    @Override
+    public String[] getBomPattern() {
+        return new String[]{POM_XML};
     }
 
     @Override

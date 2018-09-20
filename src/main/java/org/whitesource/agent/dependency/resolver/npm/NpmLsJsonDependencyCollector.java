@@ -18,6 +18,7 @@ package org.whitesource.agent.dependency.resolver.npm;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.whitesource.agent.Constants;
 import org.whitesource.agent.api.model.AgentProjectInfo;
 import org.whitesource.agent.api.model.DependencyInfo;
 import org.whitesource.agent.api.model.DependencyType;
@@ -47,19 +48,16 @@ public class NpmLsJsonDependencyCollector extends DependencyCollector {
     private final Logger logger = LoggerFactory.getLogger(NpmLsJsonDependencyCollector.class);
 
     public static final String LS_COMMAND = "ls";
-    public static final String INSTALL_COMMAND = "install";
     public static final String LS_PARAMETER_JSON = "--json";
 
     private static final String NPM_COMMAND = isWindows() ? "npm.cmd" : "npm";
-    private static final String DEPENDENCIES = "dependencies";
-    private static final String VERSION = "version";
     private static final String RESOLVED = "resolved";
     private static final String LS_ONLY_PROD_ARGUMENT = "--only=prod";
-    private static final String MISSING = "missing";
     public static final String PEER_MISSING = "peerMissing";
     private static final String DEDUPED = "deduped";
     private static final String REQUIRED = "required";
-
+    private static final String IGNORE_SCRIPTS = "--ignore-scripts";
+    private static final String UNMET_DEPENDENCY = "+-- UNMET DEPENDENCY";
     /* --- Members --- */
 
     protected final boolean includeDevDependencies;
@@ -67,15 +65,17 @@ public class NpmLsJsonDependencyCollector extends DependencyCollector {
     private final Pattern patternOfNameOfPackageFromLine = Pattern.compile(".* (.*)@(\\^)?[0-9]+\\.[0-9]+");
     private final Pattern patternOfNameOfPackageFromLineSecondChance = Pattern.compile(".* (.*)@");
     private boolean showNpmLsError;
-    private boolean npmLsFailureStatus = false;
-    private final long npmTimeoutDependenciesCollector;
+    protected boolean npmLsFailureStatus = false;
+    protected final long npmTimeoutDependenciesCollector;
+    private final boolean ignoreScripts;
 
     /* --- Constructors --- */
 
-    public NpmLsJsonDependencyCollector(boolean includeDevDependencies, long npmTimeoutDependenciesCollector, boolean ignoreNpmLsErrors) {
+    public NpmLsJsonDependencyCollector(boolean includeDevDependencies, long npmTimeoutDependenciesCollector, boolean ignoreNpmLsErrors, boolean ignoreScripts) {
         this.npmTimeoutDependenciesCollector = npmTimeoutDependenciesCollector;
         this.includeDevDependencies = includeDevDependencies;
         this.ignoreNpmLsErrors = ignoreNpmLsErrors;
+        this.ignoreScripts = ignoreScripts;
     }
 
     /* --- Public methods --- */
@@ -115,7 +115,7 @@ public class NpmLsJsonDependencyCollector extends DependencyCollector {
         return getSingleProjectList(dependencies);
     }
 
-    public boolean executePreparationStep(String folder ) {
+    public boolean executePreparationStep(String folder) {
         String[] command = getInstallParams();
         logger.debug("Running install command : " + command);
         CommandLineProcess npmInstall = new CommandLineProcess(folder, command);
@@ -131,12 +131,12 @@ public class NpmLsJsonDependencyCollector extends DependencyCollector {
     /* --- Private methods --- */
 
     private int getDependencies(JSONObject npmLsJson, List<String> linesOfNpmLs, int currentLineNumber, Collection<DependencyInfo> dependencies) {
-        if (npmLsJson.has(DEPENDENCIES)) {
-            JSONObject dependenciesJsonObject = npmLsJson.getJSONObject(DEPENDENCIES);
+        if (npmLsJson.has(Constants.DEPENDENCIES)) {
+            JSONObject dependenciesJsonObject = npmLsJson.getJSONObject(Constants.DEPENDENCIES);
             if (dependenciesJsonObject != null) {
                 for (int i = 0; i < dependenciesJsonObject.keySet().size(); i++) {
                     String currentLine = linesOfNpmLs.get(currentLineNumber);
-                    if (currentLine.endsWith(DEDUPED)) {
+                    if (currentLine.endsWith(DEDUPED) || currentLine.startsWith(UNMET_DEPENDENCY)) {
                         currentLineNumber++;
                         continue;
                     }
@@ -186,8 +186,8 @@ public class NpmLsJsonDependencyCollector extends DependencyCollector {
         }
         String path = uri.getPath();
         String idStr = path.substring(path.lastIndexOf('/') + 1);
-        int lastIndexOfDash = idStr.lastIndexOf("-");
-        int lastIndexOfDot = idStr.lastIndexOf(".");
+        int lastIndexOfDash = idStr.lastIndexOf(Constants.DASH);
+        int lastIndexOfDot = idStr.lastIndexOf(Constants.DOT);
         String resultVersion = idStr.substring(lastIndexOfDash + 1, lastIndexOfDot);
         return resultVersion;
     }
@@ -195,9 +195,9 @@ public class NpmLsJsonDependencyCollector extends DependencyCollector {
     /* --- Protected methods --- */
 
     protected void getDependencies(JSONObject jsonObject, String rootDirectory, Collection<DependencyInfo> dependencies) {
-        CommandLineProcess npmLs = new CommandLineProcess(rootDirectory, getLsCommandParams());
-        npmLs.setTimeoutReadLineSeconds(this.npmTimeoutDependenciesCollector);
         try {
+            CommandLineProcess npmLs = new CommandLineProcess(rootDirectory, getLsCommandParams());
+            npmLs.setTimeoutReadLineSeconds(this.npmTimeoutDependenciesCollector);
             List<String> linesOfNpmLs = npmLs.executeProcess();
             getDependencies(jsonObject, linesOfNpmLs, 1, dependencies);
         } catch (IOException e) {
@@ -207,7 +207,11 @@ public class NpmLsJsonDependencyCollector extends DependencyCollector {
     }
 
     protected String[] getInstallParams() {
-        return new String[]{NPM_COMMAND, INSTALL_COMMAND};
+        if (this.ignoreScripts) {
+            return new String[]{NPM_COMMAND, Constants.INSTALL, IGNORE_SCRIPTS};
+        } else {
+            return new String[]{NPM_COMMAND, Constants.INSTALL};
+        }
     }
 
     protected String[] getLsCommandParams() {
@@ -229,12 +233,12 @@ public class NpmLsJsonDependencyCollector extends DependencyCollector {
     protected DependencyInfo getDependency(String dependencyAlias, JSONObject jsonObject) {
         String name = dependencyAlias;
         String version;
-        if (jsonObject.has(VERSION)) {
-            version = jsonObject.getString(VERSION);
+        if (jsonObject.has(Constants.VERSION)) {
+            version = jsonObject.getString(Constants.VERSION);
         } else {
             if (jsonObject.has(RESOLVED)) {
                 version = getVersionFromLink(jsonObject.getString(RESOLVED));
-            } else if (jsonObject.has(MISSING) && jsonObject.getBoolean(MISSING)) {
+            } else if (jsonObject.has(Constants.MISSING) && jsonObject.getBoolean(Constants.MISSING)) {
                 logger.warn("Unmet dependency --> {}", name);
                 return null;
             } else if (jsonObject.has(PEER_MISSING) && jsonObject.getBoolean(PEER_MISSING)) {

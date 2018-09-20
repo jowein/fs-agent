@@ -17,6 +17,7 @@ package org.whitesource.agent.dependency.resolver.nuget;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.whitesource.agent.Constants;
 import org.whitesource.agent.api.model.DependencyInfo;
 import org.whitesource.agent.api.model.DependencyType;
 import org.whitesource.agent.dependency.resolver.AbstractDependencyResolver;
@@ -38,7 +39,6 @@ public class NugetDependencyResolver extends AbstractDependencyResolver{
     private final Logger logger = LoggerFactory.getLogger(NugetDependencyResolver.class);
     public static final String CONFIG = ".config";
     public static final String CSPROJ = ".csproj";
-    public static final String PATTERN = "**/*";
 
     /* --- Members --- */
 
@@ -53,9 +53,9 @@ public class NugetDependencyResolver extends AbstractDependencyResolver{
         this.whitesourceConfiguration = whitesourceConfiguration;
         this.nugetConfigFileType = nugetConfigFileType;
         if (this.nugetConfigFileType == NugetConfigFileType.CONFIG_FILE_TYPE) {
-            bomPattern = PATTERN + CONFIG;
+            bomPattern = Constants.PATTERN + CONFIG;
         } else {
-            bomPattern = PATTERN + CSPROJ;
+            bomPattern = Constants.PATTERN + CSPROJ;
         }
     }
 
@@ -68,18 +68,19 @@ public class NugetDependencyResolver extends AbstractDependencyResolver{
 
     protected ResolutionResult getResolutionResultFromParsing(String topLevelFolder, Set<String> configFiles, boolean onlyDependenciesFromReferenceTag) {
         Collection<DependencyInfo> dependencies = parseNugetPackageFiles(configFiles, onlyDependenciesFromReferenceTag);
-
         return new ResolutionResult(dependencies, new LinkedList<>(), getDependencyType(), topLevelFolder);
     }
 
     @Override
     protected Collection<String> getExcludes() {
-        return new ArrayList<>();
+        List<String> excludes = new LinkedList<>();
+        excludes.add(CommandLineArgs.CONFIG_FILE_NAME);
+        return excludes;
     }
 
     @Override
-    protected Collection<String> getSourceFileExtensions() {
-        return new ArrayList<>(Arrays.asList(".dll", ".exe", ".nupkg", ".cs"));
+    public Collection<String> getSourceFileExtensions() {
+        return new ArrayList<>(Arrays.asList(Constants.DLL, Constants.EXE, Constants.NUPKG, Constants.CS));
     }
 
     @Override
@@ -88,8 +89,13 @@ public class NugetDependencyResolver extends AbstractDependencyResolver{
     }
 
     @Override
-    protected String getBomPattern() {
-        return this.bomPattern;
+    protected String getDependencyTypeName() {
+        return DependencyType.NUGET.name();
+    }
+
+    @Override
+    protected String[] getBomPattern() {
+        return new String[]{this.bomPattern};
     }
 
     @Override
@@ -109,7 +115,7 @@ public class NugetDependencyResolver extends AbstractDependencyResolver{
                 if (!configFile.getName().equals(CommandLineArgs.CONFIG_FILE_NAME)) {
                     NugetPackagesConfigXmlParser parser = new NugetPackagesConfigXmlParser(configFile, this.nugetConfigFileType);
                     Set<DependencyInfo> dependenciesFromSingleFile = parser.parsePackagesConfigFile(getDependenciesFromReferenceTag,configFilePath);
-                    if (dependenciesFromSingleFile != null) {
+                    if (!dependenciesFromSingleFile.isEmpty()) {
                         dependencies.addAll(dependenciesFromSingleFile);
                     }
                 }

@@ -17,6 +17,7 @@ package org.whitesource.fs;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.converters.CommaParameterSplitter;
+import org.whitesource.agent.Constants;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -36,11 +37,11 @@ public class CommandLineArgs {
     String configFilePath = CONFIG_FILE_NAME;
 
     //TODO use a File converter for dependencyDir and configFilePath
-    @Parameter(names = "-d", splitter = CommaParameterSplitter.class, description = "Comma separated list of directories and / or files to scan")
+    @Parameter(names = "-d", splitter = CommaParameterSplitter.class, description = "Comma separated list of directories and/or files to scan")
     List<String> dependencyDirs = new LinkedList<>(); // TODO this may be a bad default, consider printing usage instead
 
     @Parameter(names = "-f", description = "File list path")
-    String fileListPath = "";
+    String fileListPath = Constants.EMPTY_STRING;
 
     @Parameter(names = "-apiKey", description = "Organization api key")
     String apiKey = null;
@@ -76,10 +77,10 @@ public class CommandLineArgs {
     List<String> requestFiles = new LinkedList<>();
 
     @Parameter(names = "-projectPerFolder", description = "Creates a project for each subfolder, the subfolder's name is used as the project name")
-    String projectPerFolder = "";
+    String projectPerFolder = Constants.EMPTY_STRING;
 
     @Parameter(names = "-updateType", description = "Specify if the project dependencies should be removed before adding the new ones")
-    String updateType = "";
+    String updateType = Constants.EMPTY_STRING;
 
     @Parameter(names = "-scm.repositoriesFile", description = "Specify the csv file from which scm repositories should be loaded")
     String repositoriesFile = null;
@@ -91,7 +92,7 @@ public class CommandLineArgs {
     String web = "false";
 
     @Parameter(names = "-whiteSourceFolderPath", description = "WhiteSource folder path for offlineRequest/checkPolicies")
-    String whiteSourceFolder = "";
+    String whiteSourceFolder = Constants.EMPTY_STRING;
 
     @Parameter(names = "-appPath", description = "Impact Analysis application path")
     List<String> appPath = new LinkedList<>();
@@ -113,6 +114,18 @@ public class CommandLineArgs {
 
     @Parameter(names = "-userKey", description = "user key uniquely identifying the account at white source")
     String userKey = null;
+
+    @Parameter(names = "-projectToken", description = "API token to match an existing WhiteSource project")
+    String projectToken = null;
+
+    @Parameter(names = "-productToken", description = "Unique identifier of the product to update")
+    String productToken = null;
+
+    @Parameter(names = "-logLevel", description = "log level of the project")
+    String logLevel = null;
+
+    @Parameter(names = "-requirementsFileIncludes", description = "List of dependency files split by comma")
+    List<String> requirementsFileIncludes = new LinkedList<>();
 
     /* --- Public methods --- */
 

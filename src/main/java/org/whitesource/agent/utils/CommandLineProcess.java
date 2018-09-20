@@ -1,9 +1,12 @@
 package org.whitesource.agent.utils;
 
+import com.sun.jna.Native;
+import com.sun.jna.platform.win32.Kernel32;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.whitesource.agent.Constants;
 import org.whitesource.agent.dependency.resolver.DependencyCollector;
 
 import java.io.BufferedReader;
@@ -20,6 +23,7 @@ import java.util.concurrent.*;
 public class CommandLineProcess {
 
     /* --- Members --- */
+
     private String rootDirectory;
     private String[] args;
     private long timeoutReadLineSeconds;
@@ -30,6 +34,7 @@ public class CommandLineProcess {
     /* --- Statics Members --- */
     private static final long DEFAULT_TIMEOUT_READLINE_SECONDS = 300;
     private static final long DEFAULT_TIMEOUT_PROCESS_MINUTES = 15;
+    private static final String WINDOWS_SEPARATOR = "\\";
     private final Logger logger = LoggerFactory.getLogger(org.whitesource.agent.utils.CommandLineProcess.class);
 
     public CommandLineProcess(String rootDirectory, String[] args) {
@@ -46,6 +51,10 @@ public class CommandLineProcess {
     private List<String> executeProcess(boolean includeOutput, boolean includeErrorLines) throws IOException {
         List<String> linesOutput = new LinkedList<>();
         ProcessBuilder pb = new ProcessBuilder(args);
+        String osName = System.getProperty(Constants.OS_NAME);
+        if (osName.startsWith(Constants.WINDOWS)) {
+            rootDirectory = getShortPath(rootDirectory);
+        }
         pb.directory(new File(rootDirectory));
         // redirect the error output to avoid output of npm ls by operating system
         String redirectErrorOutput = DependencyCollector.isWindows() ? "nul" : "/dev/null";
@@ -56,7 +65,7 @@ public class CommandLineProcess {
             pb.redirectOutput(new File(redirectErrorOutput));
         }
         if (!includeErrorLines) {
-            logger.debug("start execute command '{}' in '{}'", String.join(" ", args), rootDirectory);
+            logger.debug("start execute command '{}' in '{}'", String.join(Constants.WHITESPACE, args), rootDirectory);
         }
         this.processStart = pb.start();
         if (includeOutput) {
@@ -78,9 +87,39 @@ public class CommandLineProcess {
             logger.error("'{}' was interrupted {}", args, e);
         }
         if (this.processStart.exitValue() != 0) {
+            logger.debug("error in execute command {}", this.processStart.exitValue());
             this.errorInProcess = true;
         }
         return linesOutput;
+    }
+
+    //get windows short path
+    private String getShortPath(String rootPath) {
+        File file = new File(rootPath);
+        String lastPathAfterSeparator = null;
+        String shortPath = getWindowsShortPath(file.getAbsolutePath());
+        if (StringUtils.isNotEmpty(shortPath)) {
+            return getWindowsShortPath(file.getAbsolutePath());
+        } else {
+            while (StringUtils.isEmpty(getWindowsShortPath(file.getAbsolutePath()))) {
+                String filePath = file.getAbsolutePath();
+                if (StringUtils.isNotEmpty(lastPathAfterSeparator)) {
+                    lastPathAfterSeparator = file.getAbsolutePath().substring(filePath.lastIndexOf(WINDOWS_SEPARATOR), filePath.length()) + lastPathAfterSeparator;
+                } else {
+                    lastPathAfterSeparator = file.getAbsolutePath().substring(filePath.lastIndexOf(WINDOWS_SEPARATOR), filePath.length());
+                }
+                file = file.getParentFile();
+            }
+            return getWindowsShortPath(file.getAbsolutePath()) + lastPathAfterSeparator;
+        }
+    }
+
+    private String getWindowsShortPath(String path) {
+        char[] result = new char[256];
+
+        //Call CKernel32 interface to execute GetShortPathNameA method
+        Kernel32.INSTANCE.GetShortPathName(path, result, result.length);
+        return Native.toString(result);
     }
 
     private boolean readBlock(InputStreamReader inputStreamReader, BufferedReader reader, ExecutorService executorService, List<String> lines, boolean includeErrorLines) {
@@ -91,7 +130,7 @@ public class CommandLineProcess {
                 logger.debug("trying to read lines using '{}'", args);
             }
             int lineIndex = 1;
-            String line = "";
+            String line = Constants.EMPTY_STRING;
             while (continueReadingLines && line != null) {
                 Future<String> future = executorService.submit(new CommandLineProcess.ReadLineTask(reader));
                 try {

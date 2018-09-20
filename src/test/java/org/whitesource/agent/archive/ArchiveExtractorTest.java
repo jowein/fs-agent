@@ -3,6 +3,7 @@ package org.whitesource.agent.archive;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.whitesource.agent.Constants;
 import org.whitesource.agent.dependency.resolver.npm.TestHelper;
 import org.whitesource.agent.utils.FilesScanner;
 import org.whitesource.agent.utils.Pair;
@@ -30,11 +31,11 @@ public class ArchiveExtractorTest {
         int archiveExtractionDepth = 5;
 
         ArchiveExtractor archiveExtractor = new ArchiveExtractor(archiveIncludes, archiveExcludes, fileExcludes);
-        String scannerFile = Paths.get("", "C:\\Issues\\bigJar\\wss-server-1.1.0-SNAPSHOT.war").toString();
+        String scannerFile = Paths.get(Constants.EMPTY_STRING, "C:\\Issues\\bigJar\\wss-server-1.1.0-SNAPSHOT.war").toString();
         String unzipFolderFilter = archiveExtractor.extractArchives(scannerFile, archiveExtractionDepth, new ArrayList<>());
 
         archiveExtractor = new ArchiveExtractor(archiveIncludes, archiveExcludes, new String[0]);
-        scannerFile = Paths.get("", "C:\\Issues\\bigJar\\wss-server-1.1.0-SNAPSHOT.war").toString();
+        scannerFile = Paths.get(Constants.EMPTY_STRING, "C:\\Issues\\bigJar\\wss-server-1.1.0-SNAPSHOT.war").toString();
         String unzipFolderAll = archiveExtractor.extractArchives(scannerFile, archiveExtractionDepth, new ArrayList<>());
 
         FilesScanner fs = new FilesScanner();
@@ -68,7 +69,8 @@ public class ArchiveExtractorTest {
         String unzipFolder = getUnzippedFolderFromTest();
         Assert.assertNotNull(unzipFolder);
 
-        File fileDepth3 = new File(Paths.get(unzipFolder, TestHelper.getOsRelativePath("src_depth_2\\test\\resources\\dist\\node_modules\\node_modules\\accepts\\accepts\\index.js")).toString());
+        File fileDepth3 = new File(Paths.get(unzipFolder, TestHelper.getOsRelativePath(
+                "src_depth_2\\test\\resources\\dist\\node_modules\\node_modules\\accepts\\accepts\\index.js")).toString());
         Assert.assertTrue(fileDepth3.exists());
 
         for (Integer i = 0; i < 10; i++) {
@@ -119,7 +121,7 @@ public class ArchiveExtractorTest {
         String[] archiveExcludes = new String[0];
         ArchiveExtractor archiveExtractor = new ArchiveExtractor(archiveIncludes, archiveExcludes, new String[0]);
 
-        String scannerBaseDir = Paths.get(currentDirectory, "src").toString();
+        String scannerBaseDir = Paths.get(currentDirectory, Constants.SRC).toString();
         int archiveExtractionDepth = 4;
         String unzipFolder = archiveExtractor.extractArchives(scannerBaseDir, archiveExtractionDepth, new ArrayList<>());
         return unzipFolder;

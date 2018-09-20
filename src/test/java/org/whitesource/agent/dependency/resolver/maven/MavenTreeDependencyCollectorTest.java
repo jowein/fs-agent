@@ -41,7 +41,7 @@ public class MavenTreeDependencyCollectorTest {
     }
 
     private Collection<DependencyInfo> testFsa(String currentDirectory) {
-        MavenTreeDependencyCollector mavenTreeDependencyCollector = new MavenTreeDependencyCollector(null);
+        MavenTreeDependencyCollector mavenTreeDependencyCollector = new MavenTreeDependencyCollector(null, true);
 
         Collection<AgentProjectInfo> projects = mavenTreeDependencyCollector.collectDependencies(currentDirectory);
 
@@ -58,13 +58,10 @@ public class MavenTreeDependencyCollectorTest {
         props.setProperty(ConfigPropertyKeys.NPM_RESOLVE_DEPENDENCIES, "false");
         props.setProperty(ConfigPropertyKeys.NUGET_RESOLVE_DEPENDENCIES, "false");
         props.setProperty(ConfigPropertyKeys.BOWER_RESOLVE_DEPENDENCIES, "false");
-
         props.setProperty(ConfigPropertyKeys.INCLUDES_PATTERN_PROPERTY_KEY, "**/*.jar");
         ResolverConfiguration resolverConfiguration = new FSAConfiguration(props).getResolver();
-
         DependencyResolutionService dependencyResolutionService = new DependencyResolutionService(resolverConfiguration);
         List<ResolutionResult> results = dependencyResolutionService.resolveDependencies(Arrays.asList(folderParent), new String[0]);
-
         TestHelper.testDependencyResult(true, results);
     }
 }

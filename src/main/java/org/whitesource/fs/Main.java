@@ -22,6 +22,7 @@ import io.vertx.core.VertxOptions;
 import io.vertx.core.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.whitesource.agent.Constants;
 import org.whitesource.agent.ProjectsSender;
 import org.whitesource.agent.api.dispatch.UpdateInventoryRequest;
 import org.whitesource.agent.api.model.AgentProjectInfo;
@@ -43,8 +44,6 @@ public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     public static final long MAX_TIMEOUT = 1000 * 60 * 60;
-    public static final String FALSE = "false";
-    public static final String EMPPTY_STRING = "";
 
     /* --- Main --- */
 
@@ -61,8 +60,8 @@ public class Main {
 
         // read configuration senderConfig
         FSAConfiguration fsaConfiguration = new FSAConfiguration(args);
-        boolean isStandalone = commandLineArgs.web.equals(FALSE);
-
+        boolean isStandalone = commandLineArgs.web.equals(Constants.FALSE);
+        logger.info(fsaConfiguration.toString());
         if (isStandalone) {
             try {
                 if (fsaConfiguration.getErrors() == null || fsaConfiguration.getErrors().size() > 0) {
@@ -77,6 +76,7 @@ public class Main {
                 logger.warn("Process encountered an error: {}" + e.getMessage(), e);
                 processExitCode = StatusCode.ERROR;
             }
+            logger.info("Process finished with exit code {} ({})", processExitCode.name(), processExitCode.getValue());
             System.exit(processExitCode.getValue());
         } else {
             //this is a work around
@@ -135,7 +135,7 @@ public class Main {
         }
 
         if (!result.getStatusCode().equals(StatusCode.SUCCESS)) {
-            return new ProjectsDetails(result.getProjects(), result.getStatusCode(), EMPPTY_STRING);
+            return new ProjectsDetails(result.getProjects(), result.getStatusCode(), Constants.EMPTY_STRING);
         }
 
         if (shouldSend) {
@@ -144,7 +144,7 @@ public class Main {
             logger.debug("Process finished with exit code {} ({})", processExitCode.getKey(), processExitCode.getValue());
             return new ProjectsDetails(new ArrayList<>(), processExitCode.getValue(), processExitCode.getKey());
         } else {
-            return new ProjectsDetails(result.getProjects(), result.getStatusCode(), EMPPTY_STRING);
+            return new ProjectsDetails(result.getProjects(), result.getStatusCode(), Constants.EMPTY_STRING);
         }
     }
 

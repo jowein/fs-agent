@@ -4,16 +4,16 @@
 
     <groupId>org.whitesource</groupId>
     <artifactId>whitesource-fs-agent</artifactId>
-    <version>18.4.2-SNAPSHOT</version>
+    <version>18.7.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>White Source File System Agent</name>
-    <description>File System Agent is a simple java command line tool which extracts descriptive information from your open source libraries</description>
+    <description>23 File System Agent is a simple java command line tool which extracts descriptive information from your open source libraries</description>
     <url>https://github.com/whitesource/fs-agent</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <agent.api.version>2.6.8</agent.api.version>
+        <agent.api.version>2.7.6</agent.api.version>
         <slf4j.version>1.7.5</slf4j.version>
         <skipTests>true</skipTests>
     </properties>
@@ -44,14 +44,9 @@
 
     <developers>
         <developer>
-            <id>anna.rozin</id>
-            <name>Anna Rozin</name>
-            <email>anna.rozin@whitesourcesoftware.com</email>
-        </developer>
-        <developer>
-            <id>tom.shapira</id>
-            <name>Tom Shapira</name>
-            <email>tom.shapira@whitesourcesoftware.com</email>
+            <id>tom.shapiraa</id>
+            <name>Tom Shapiraa</name>
+            <email>tom.shapiraa@whitesourcesoftware.com</email>
         </developer>
     </developers>
 
@@ -144,14 +139,11 @@
         <dependency>
             <groupId>org.whitesource.analysis</groupId>
             <artifactId>whitesource-analysis-via</artifactId>
-            <version>0.0.20</version>
+            <version>18.7.2.40</version>
          </dependency>
 
-        <dependency>
-            <groupId>guru.nidi</groupId>
-            <artifactId>graphviz-java</artifactId>
-            <version>0.2.3</version>
-        </dependency>
+
+        <!-- end VIA -->
 
         <!-- LZMA -->
         <dependency>
@@ -227,6 +219,12 @@
             <version>2.9.2</version>
         </dependency>
 
+        <!-- jsoup for html/css parsing -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.11.3</version>
+        </dependency>
 
         <!-- jaxb for nuget dependecy resolver -->
         <!-- https://mvnrepository.com/artifact/javax.xml.bind/jaxb-api -->
