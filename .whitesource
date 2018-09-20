@@ -4,4 +4,4 @@
 
 # Configuration #
 #---------------#
-ws.repo.scan=false
+ws.repo.scan=true
