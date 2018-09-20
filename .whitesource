@@ -3,4 +3,4 @@
 
 # Configuration
 #--------------
-#scanRepository=false
+ws.repo.scan=true
