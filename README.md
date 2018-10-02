@@ -1,6 +1,6 @@
 WhiteSource File System Agent 24
 
-An [external update agent][1] for projects.
+1An [external update agent][1] for projects.
 
 The agent looks for open source usage in your projects and update your [White Source][2] account.
 
