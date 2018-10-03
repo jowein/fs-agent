@@ -1,4 +1,4 @@
-Yos File System Agent16
+Yos File System Agent
 
 1An [external update agent][1] for projects.
 
