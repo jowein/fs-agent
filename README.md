@@ -1,4 +1,4 @@
-WhiteSource File System Agent 24
+Yos File System Agent
 
 An [external update agent][1] for projects.
 
